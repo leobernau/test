@@ -1,973 +1,223 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Bernau Games - Flappy Bird</title>
-<style>
-  :root{
-    --ui-bg: rgba(10,12,20,0.6);
-    --panel: rgba(255,255,255,0.06);
-    --accent: #ffd54f;
-  }
-  html,body{ height:100%; margin:0; background:#0b1220; color:#fff; font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
-  #app{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#0b1220,#082034); overflow:hidden; }
-  canvas{ display:block; width:100%; height:100%; max-width:1400px; max-height:900px; background:linear-gradient(180deg,#87ceeb,#bfe9ff); border-radius:10px; box-shadow:0 30px 80px rgba(0,0,0,0.6); }
-  /* HUD */
-  .hud{ position:absolute; top:12px; left:12px; display:flex; gap:8px; align-items:center; z-index:30; }
-  .pill{ background:var(--ui-bg); padding:8px 12px; border-radius:999px; backdrop-filter: blur(6px) saturate(120%); border:1px solid rgba(255,255,255,0.06); display:flex; gap:10px; align-items:center; font-weight:600; }
-  .right-hud{ position:absolute; top:12px; right:12px; display:flex; gap:8px; align-items:center; z-index:30; }
-  .icon-btn{ background:var(--panel); padding:8px; border-radius:10px; cursor:pointer; border:1px solid rgba(255,255,255,0.04); user-select:none; }
-  .icon-btn:active{ transform:scale(.98); }
-  /* overlays */
-  .overlay{ position:absolute; inset:0; display:grid; place-items:center; z-index:50; background:linear-gradient(180deg, rgba(2,6,23,0.6), rgba(2,6,23,0.6)); }
-  .card{ background:rgba(255,255,255,0.04); padding:18px; border-radius:14px; width:min(92vw,920px); max-width:96%; box-shadow:0 20px 60px rgba(0,0,0,0.6); border:1px solid rgba(255,255,255,0.04); color:#fff; }
-  .row{ display:flex; gap:10px; align-items:center; justify-content:space-between; }
-  h1{ margin:0 0 8px 0; font-size:clamp(18px,3vw,28px); }
-  p{ margin:0 0 8px 0; opacity:0.9; }
-  button.cta{ background:linear-gradient(90deg,#ffd54f,#ffb86b); border:none; padding:10px 14px; border-radius:10px; font-weight:800; cursor:pointer; }
-  button.ghost{ background:transparent; border:1px solid rgba(255,255,255,0.08); padding:8px 10px; border-radius:8px; cursor:pointer; }
-  .close-x{ position:absolute; right:12px; top:12px; background:rgba(0,0,0,0.3); border-radius:999px; padding:8px; cursor:pointer; }
-  /* shop grid */
-  .grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:12px; margin-top:12px; }
-  .skin-card{ background:rgba(255,255,255,0.03); border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:8px; align-items:center; border:1px solid rgba(255,255,255,0.03); }
-  .preview{ width:120px; height:70px; border-radius:8px; display:grid; place-items:center; position:relative; overflow:hidden; }
-  .meta{ font-size:12px; opacity:0.9; }
-  .muted{ opacity:0.7; font-size:13px; }
-  /* footer small */
-  .small{ font-size:12px; opacity:0.8; margin-top:8px; text-align:center; }
-  /* responsive tweaks */
-  @media (orientation:portrait){
-    canvas{ max-width:720px; max-height:960px; border-radius:6px; }
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Bernau Games - Flappy Bird</title>
+  <style>
+    html, body { margin:0; padding:0; overflow:hidden; }
+    body { font-family:sans-serif; background:#222; }
+    canvas { display:block; }
+    .overlay {
+      position:absolute; top:0; left:0; width:100%; height:100%; display:flex;
+      justify-content:center; align-items:center; background:rgba(0,0,0,0.7);
+      z-index:10; flex-direction:column; color:white; overflow:auto;
+    }
+    .overlay button { margin-top:10px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; }
+    .close-btn { position:absolute; top:10px; right:20px; background:#ff4444; border:none; border-radius:50%; width:30px; height:30px; color:white; font-weight:bold; cursor:pointer; }
+    #shopOverlay ul { max-height:70%; overflow-y:auto; width:80%; }
+    #shopOverlay li { margin:10px; padding:10px; background:#333; border-radius:8px; display:flex; justify-content:space-between; align-items:center; }
+  </style>
 </head>
 <body>
-<div id="app" aria-live="polite">
-  <canvas id="game" width="960" height="640" role="img" aria-label="Bernau Games Flappy Bird Spiel"></canvas>
+<canvas id="gameCanvas"></canvas>
 
-  <div class="hud" aria-hidden="false">
-    <div class="pill" id="coinPill">🪙 <span id="coinCount">0</span></div>
-    <div class="pill">✨ Highscore: <b id="highscore">0</b></div>
-    <div class="pill">🎭 Skin: <span id="activeSkinName">Classic</span></div>
-  </div>
+<!-- Intro Overlay -->
+<div id="introOverlay" class="overlay">
+  <button class="close-btn" id="closeIntroBtn">X</button>
+  <h1>Willkommen zu Bernau Games - Flappy Bird 🎉</h1>
+  <p>Drücke <b>Leertaste</b>, um loszufliegen!</p>
+  <p>Mit <b>S</b> öffnest/schließt du den Shop.</p>
+  <button id="startBtn">OK, los geht’s!</button>
+</div>
 
-  <div class="right-hud">
-    <div class="icon-btn" id="btnPause" title="Pause (P)">⏸</div>
-    <div class="icon-btn" id="btnMute" title="Mute (M)">🔊</div>
-    <div class="icon-btn" id="btnShop" title="Shop (S)">🛍️</div>
-    <div class="icon-btn" id="btnHelp" title="Hilfe (H)">❓</div>
-  </div>
-
-  <!-- Intro overlay -->
-  <div id="intro" class="overlay" role="dialog" aria-modal="true" style="z-index:60;">
-    <div class="card" style="max-width:680px; position:relative;">
-      <div class="close-x" id="introX" title="Schließen">✕</div>
-      <h1>Bernau Games - Flappy Bird 🎉</h1>
-      <p>Willkommen! Drücke <b>Leertaste</b> oder tippe, um zu starten. Sammle Münzen, schalte bis zu <b>50+ Skins</b> frei und passe auch Röhren & Münzen an.</p>
-      <div class="row" style="margin-top:10px;">
-        <div>
-          <button class="cta" id="startBtn">▶️ Spielen</button>
-          <button class="ghost" id="openShopBtn">🛍️ Shop</button>
-        </div>
-        <div style="text-align:right;">
-          <div class="muted">Steuerung: Leertaste = Flap / S = Shop / P = Pause / M = Ton / R = Neustart</div>
-        </div>
-      </div>
-      <div class="small">Viel Spaß — das Spiel speichert Fortschritt lokal (localStorage).</div>
-    </div>
-  </div>
-
-  <!-- Game over overlay -->
-  <div id="gameOver" class="overlay" role="dialog" aria-modal="true" style="display:none; z-index:70;">
-    <div class="card" style="max-width:560px; position:relative;">
-      <h1>Game Over 😵</h1>
-      <p>Dein Score: <b id="lastScore">0</b> · Highscore: <b id="bestScore">0</b></p>
-      <div class="row" style="margin-top:10px;">
-        <button class="cta" id="restartBtn">↺ Neustarten (R)</button>
-        <button class="ghost" id="goShopBtn">🛍️ Shop</button>
-      </div>
-      <div class="small">Drücke Leertaste oder R, um direkt neu zu starten.</div>
-    </div>
-  </div>
-
-  <!-- Shop overlay -->
-  <div id="shop" class="overlay" role="dialog" aria-modal="true" style="display:none; z-index:80;">
-    <div class="card" style="position:relative;">
-      <div class="close-x" id="shopX" title="Schließen">✕</div>
-      <h1>Shop — Skins, Pipes & Coins 🎨</h1>
-      <p class="muted">Wähle Vogel-Skin, Röhren-Stil und Münz-Look. Kaufe Skins mit Münzen.</p>
-
-      <h3 style="margin-top:12px; margin-bottom:6px;">Vogel-Skins</h3>
-      <div id="skinGrid" class="grid"></div>
-
-      <h3 style="margin-top:12px; margin-bottom:6px;">Röhren-Skins</h3>
-      <div id="pipeGrid" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));"></div>
-
-      <h3 style="margin-top:12px; margin-bottom:6px;">Münz-Skins</h3>
-      <div id="coinGrid" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));"></div>
-
-      <div class="row" style="margin-top:12px;">
-        <div class="muted">Deine Münzen: <b id="shopCoins">0</b></div>
-        <div><button class="ghost" id="closeShopBtn">Schließen</button></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Help overlay -->
-  <div id="help" class="overlay" role="dialog" aria-modal="true" style="display:none; z-index:60;">
-    <div class="card" style="max-width:640px; position:relative;">
-      <div class="close-x" id="helpX">✕</div>
-      <h1>Hilfe & Tipps</h1>
-      <p>Leertaste/Tap: Flap · P: Pause · S: Shop · M: Mute · R: Neustart · Esc: Overlays schließen</p>
-      <p>Je weiter du kommst, desto mehr Münzen sammelst du. Verwende Münzen, um Skins zu kaufen. Skins ändern Aussehen der Vögel, Röhren oder Münzen.</p>
-      <div style="text-align:center; margin-top:8px;"><button class="cta" id="closeHelpBtn">Verstanden</button></div>
-    </div>
-  </div>
+<!-- Shop Overlay -->
+<div id="shopOverlay" class="overlay" style="display:none">
+  <button class="close-btn" id="closeShopBtn">X</button>
+  <h2>🛒 Shop</h2>
+  <ul id="shopItems"></ul>
 </div>
 
 <script>
-/*
-  Bernau Games - Flappy Bird
-  Version: All-in (50+ Skins, pipe/coin customization, music, fullscreen, restart logic)
-  Hinweis: Skins werden programmgesteuert erzeugt. Progress wird in localStorage gespeichert.
-*/
-
-/* ---------------------------
-   Utilities & Persistence
-   --------------------------- */
-const LS_KEY = 'bernau_flappy_v2';
-function saveState(state){
-  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
-}
-function loadState(){
-  try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }catch(e){ return {}; }
-}
-let state = loadState(); // coin, highscore, ownedSkins, activeSkin, pipeSkin, coinSkin, muted
-
-// sensible defaults
-state.coins = state.coins || 0;
-state.highscore = state.highscore || 0;
-state.ownedSkins = state.ownedSkins || ['skin_0']; // skin_0 = classic
-state.activeSkin = state.activeSkin || 'skin_0';
-state.pipeSkin = state.pipeSkin || 'pipe_0';
-state.coinSkin = state.coinSkin || 'coin_0';
-state.muted = typeof state.muted === 'boolean' ? state.muted : false;
-
-/* ---------------------------
-   DOM refs
-   --------------------------- */
-const canvas = document.getElementById('game');
+// Vollbild Canvas
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const coinCountEl = document.getElementById('coinCount');
-const highscoreEl = document.getElementById('highscore');
-const activeSkinNameEl = document.getElementById('activeSkinName');
-const shopCoins = document.getElementById('shopCoins');
-
-const intro = document.getElementById('intro');
-const startBtn = document.getElementById('startBtn');
-const introX = document.getElementById('introX');
-const btnPause = document.getElementById('btnPause');
-const btnMute = document.getElementById('btnMute');
-const btnShop = document.getElementById('btnShop');
-const openShopBtn = document.getElementById('openShopBtn');
-const shopEl = document.getElementById('shop');
-const shopX = document.getElementById('shopX');
-const closeShopBtn = document.getElementById('closeShopBtn');
-const skinGrid = document.getElementById('skinGrid');
-const pipeGrid = document.getElementById('pipeGrid');
-const coinGrid = document.getElementById('coinGrid');
-const skinNameLabel = document.getElementById('activeSkinName');
-
-const helpEl = document.getElementById('help');
-const helpX = document.getElementById('helpX');
-const closeHelpBtn = document.getElementById('closeHelpBtn');
-
-const gameOver = document.getElementById('gameOver');
-const restartBtn = document.getElementById('restartBtn');
-const goShopBtn = document.getElementById('goShopBtn');
-const lastScoreEl = document.getElementById('lastScore');
-const bestScoreEl = document.getElementById('bestScore');
-
-// HUD Buttons
-btnPause.addEventListener('click', () => togglePause());
-btnMute.addEventListener('click', () => toggleMute());
-btnShop.addEventListener('click', () => toggleShop());
-openShopBtn.addEventListener('click', () => toggleShop(true));
-shopX.addEventListener('click', ()=>toggleShop(false));
-closeShopBtn.addEventListener('click', ()=>toggleShop(false));
-introX.addEventListener('click', ()=>startGame());
-startBtn.addEventListener('click', ()=>startGame());
-helpX.addEventListener('click', ()=>closeHelp());
-closeHelpBtn.addEventListener('click', ()=>closeHelp());
-restartBtn.addEventListener('click', ()=>restartGame());
-goShopBtn.addEventListener('click', ()=>{ toggleShop(true); gameOver.style.display='none'; });
-
-/* ---------------------------
-   Canvas Scaling (Full screen)
-   --------------------------- */
-function fitCanvas(){
-  // We'll keep logical coordinate system with width W and height H that fits landscape
-  const maxW = 1400, maxH = 900;
-  // size to parent container:
-  const parent = canvas.parentElement;
-  const rect = parent.getBoundingClientRect();
-  // choose width as min(maxW, rect.width) and height accordingly with aspect ratio 16:10 (or 3:2)
-  // We'll use 16:10 logical
-  const targetAspect = 16/10;
-  let w = rect.width;
-  let h = Math.min(rect.height, maxH);
-  if(w/h > targetAspect){
-    w = Math.round(h * targetAspect);
-  } else {
-    h = Math.round(w / targetAspect);
-  }
-  // also cap
-  w = Math.min(w, maxW); h = Math.min(h, maxH);
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-
-  // set actual drawing buffer for crispness
-  const DPR = Math.max(1, Math.floor(window.devicePixelRatio || 1));
-  canvas.width = Math.round(w * DPR);
-  canvas.height = Math.round(h * DPR);
-  ctx.setTransform(DPR,0,0,DPR,0,0);
+function resizeCanvas(){
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
 }
-window.addEventListener('resize', fitCanvas);
-fitCanvas();
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
-/* ---------------------------
-   Game Variables & Constants
-   --------------------------- */
-let W = () => canvas.width / (window.devicePixelRatio || 1);
-let H = () => canvas.height / (window.devicePixelRatio || 1);
-
-const gravity = 0.36;
-const flapPower = -7.6;
-const birdStartX = 160;
-let tick = 0;
-let gameState = 'menu'; // menu, playing, paused, gameover
+// Game variables
+let gameRunning = false;
+let showIntro = true;
+let showShop = false;
 let score = 0;
-let best = state.highscore || 0;
-let coins = state.coins || 0;
+let highScore = localStorage.getItem('flappyHighScore') || 0;
 
+// Bird
+let birdY, birdX, birdVY;
+let gravity = 0.5, flapStrength = -8;
+let currentSkin = 0;
+
+// Skins & Shop
+let coins = 0;
+const birdSkins = [];
+for(let i=0;i<50;i++){
+  birdSkins.push({name:`Skin ${i+1}`, color:`hsl(${i*7},70%,50%)`, shape:'circle', price: i*10+10, purchased:false});
+}
+
+// Pipes & Coins
 let pipes = [];
-let coinsItems = [];
-let particles = [];
-let speed = 2.6;
-let spawnTimer = 0;
-let spawnInterval = 1500; // ms
+let pipeWidth = 80;
+let pipeGap = 200;
+let pipeSpeed = 3;
 
-// bird entity
-let bird = {
-  x: birdStartX,
-  y: 0,
-  vy: 0,
-  rotation: 0,
-  w: 32,
-  h: 24,
-  frame: 0,
-  flapTimer: 0,
-  alive: true
-};
+// Music
+const bgMusic = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.2;
+let musicOn = true;
+bgMusic.play();
 
-/* ---------------------------
-   Dynamic Skins generation (50+)
-   Each skin -> id 'skin_i', name, palette
-   --------------------------- */
-const SKIN_COUNT = 50; // generate 50 skins
-const skins = [];
-// helper hue generator
-for(let i=0;i<SKIN_COUNT;i++){
-  const hue = Math.round((i * 360 / SKIN_COUNT) % 360);
-  const sat = 70 + (i%7); // variation
-  const light = 45 + (i%5);
-  const body = `hsl(${hue} ${sat}% ${light}%)`;
-  const wing = `hsl(${(hue+20)%360} ${Math.max(45,sat-20)}% ${Math.min(70,light+8)}%)`;
-  const eye = '#ffffff';
-  const beak = `hsl(${(hue+45)%360} ${Math.min(80,sat+10)}% ${Math.min(60,light+10)}%)`;
-  // accessories: some skins have stripes/spots by pattern index
-  const pattern = i % 6; // 0..5
-  skins.push({
-    id: 'skin_' + i,
-    name: ['Classic','Sunset','Neon','Forest','Void','Aurora','Candy','Glaze','Tropic','Dawn'][i%10] + (i>9?(' '+(Math.floor(i/10)+1)):''),
-    palette: { body, wing, eye, beak },
-    price: i===0?0:Math.floor(5 + i*1.4), // early are cheaper
-    pattern
-  });
-}
-// pipe skins
-const pipeSkins = [];
-for(let i=0;i<12;i++){
-  const hue = (i*31)%360;
-  pipeSkins.push({
-    id:'pipe_'+i,
-    name:'Pipe '+(i+1),
-    colorTop: `hsl(${hue} 60% 32%)`,
-    colorBottom: `hsl(${(hue+10)%360} 60% 26%)`
-  });
-}
-// coin skins
-const coinSkins = [];
-for(let i=0;i<12;i++){
-  const hue = (i*37)%360;
-  coinSkins.push({
-    id:'coin_'+i,
-    name:'Coin '+(i+1),
-    color: `hsl(${hue} 70% 50%)`,
-    shine: `hsl(${(hue+40)%360} 90% 80%)`
-  });
-}
+// Overlays
+const introOverlay = document.getElementById('introOverlay');
+const shopOverlay = document.getElementById('shopOverlay');
+const shopItemsList = document.getElementById('shopItems');
 
-/* ---------------------------
-   Init owned skins if empty
-   --------------------------- */
-if(!state.ownedSkins || state.ownedSkins.length === 0){
-  state.ownedSkins = [skins[0].id];
-}
-if(!state.activeSkin) state.activeSkin = skins[0].id;
-if(!state.pipeSkin) state.pipeSkin = pipeSkins[0].id;
-if(!state.coinSkin) state.coinSkin = coinSkins[0].id;
-
-saveState(state);
-
-/* ---------------------------
-   Audio: music + sfx using WebAudio
-   --------------------------- */
-let audioCtx = null;
-let musicNode = null;
-let musicPlaying = false;
-let musicGain = null;
-let globalGain = null;
-function ensureAudio(){
-  if(audioCtx) return;
-  try{
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    globalGain = audioCtx.createGain();
-    globalGain.gain.value = state.muted?0:0.9;
-    globalGain.connect(audioCtx.destination);
-  }catch(e){ audioCtx = null; }
-}
-function toggleMute(){
-  state.muted = !state.muted;
-  if(globalGain) globalGain.gain.value = state.muted?0:0.9;
-  btnMute.textContent = state.muted? '🔈' : '🔊';
-  saveState(state);
-}
-btnMute.textContent = state.muted? '🔈' : '🔊';
-
-function startMusic(){
-  if(state.muted) return;
-  ensureAudio();
-  if(!audioCtx) return;
-  if(musicNode) return; // already
-  musicGain = audioCtx.createGain(); musicGain.gain.value = 0.12;
-  musicGain.connect(globalGain || audioCtx.destination);
-  // simple looped ambient via 3 oscillators and LFO
-  const o1 = audioCtx.createOscillator();
-  const o2 = audioCtx.createOscillator();
-  const o3 = audioCtx.createOscillator();
-  o1.type='sine'; o2.type='sine'; o3.type='sine';
-  o1.frequency.value = 110; o2.frequency.value = 220; o3.frequency.value = 330;
-  const g1 = audioCtx.createGain(); g1.gain.value = 0.32;
-  const g2 = audioCtx.createGain(); g2.gain.value = 0.18;
-  const g3 = audioCtx.createGain(); g3.gain.value = 0.08;
-  o1.connect(g1); o2.connect(g2); o3.connect(g3);
-  g1.connect(musicGain); g2.connect(musicGain); g3.connect(musicGain);
-  o1.start(); o2.start(); o3.start();
-  musicNode = [o1,o2,o3,g1,g2,g3,musicGain];
-  musicPlaying = true;
-}
-function stopMusic(){
-  if(!musicNode || !audioCtx) return;
-  musicNode.forEach(n => { try{ n.stop && n.stop(); n.disconnect && n.disconnect(); }catch(e){} });
-  musicNode = null;
-  musicPlaying = false;
-}
-function playSfx(freq=600, dur=0.08, type='sine', vol=0.12){
-  if(state.muted) return;
-  ensureAudio();
-  if(!audioCtx) return;
-  const o = audioCtx.createOscillator(); o.type = type; o.frequency.value = freq;
-  const g = audioCtx.createGain(); g.gain.value = vol;
-  o.connect(g); g.connect(globalGain || audioCtx.destination);
-  o.start();
-  o.stop(audioCtx.currentTime + dur);
-}
-
-/* ---------------------------
-   Utility drawing helpers
-   --------------------------- */
-function drawRoundedRect(x,y,w,h,r){
-  ctx.beginPath();
-  ctx.moveTo(x+r,y);
-  ctx.arcTo(x+w,y,x+w,y+h,r);
-  ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r);
-  ctx.arcTo(x,y,x+w,y,r);
-  ctx.closePath();
-  ctx.fill();
-}
-
-/* ---------------------------
-   Bird drawing (sprite-like) — more life than a circle
-   Uses current skin palette
-   --------------------------- */
-function drawBirdSprite(b){
-  // b: {x,y,rotation,frame}
-  const skin = skins.find(s => s.id === state.activeSkin) || skins[0];
-  const pal = skin.palette;
-  const x = b.x, y = b.y;
-  ctx.save();
-  ctx.translate(x,y);
-  ctx.rotate(b.rotation);
-  // body
-  ctx.fillStyle = pal.body;
-  ctx.beginPath();
-  ctx.ellipse(0,0, b.w*1.15, b.h*1.0, 0, 0, Math.PI*2);
-  ctx.fill();
-  // wing (animated with frame)
-  const wingOffset = Math.sin(b.flapTimer*0.18) * 6;
-  ctx.fillStyle = pal.wing;
-  ctx.beginPath();
-  ctx.ellipse(-6, 2+wingOffset, b.w*0.6, b.h*0.55, -0.5, 0, Math.PI*2);
-  ctx.fill();
-  // tail
-  ctx.fillStyle = '#00000020';
-  ctx.beginPath();
-  ctx.moveTo(-b.w*0.8, 6);
-  ctx.lineTo(-b.w*1.5, 12);
-  ctx.lineTo(-b.w*0.8, 10);
-  ctx.closePath();
-  ctx.fill();
-  // eye
-  ctx.fillStyle = pal.eye;
-  ctx.beginPath();
-  ctx.arc(7, -6, Math.max(2, b.w*0.12), 0, Math.PI*2);
-  ctx.fill();
-  ctx.fillStyle = '#000';
-  ctx.beginPath(); ctx.arc(8.5,-6, Math.max(1.0, b.w*0.055), 0, Math.PI*2); ctx.fill();
-  // beak
-  ctx.fillStyle = pal.beak;
-  ctx.beginPath(); ctx.moveTo(b.w*0.55,0); ctx.lineTo(b.w*0.95,3); ctx.lineTo(b.w*0.55,6); ctx.closePath(); ctx.fill();
-  ctx.restore();
-}
-
-/* ---------------------------
-   Pipe & coin drawing using chosen skins
-   --------------------------- */
-function drawPipe(pipe){
-  const ps = pipeSkins.find(p => p.id === state.pipeSkin) || pipeSkins[0];
-  const x = pipe.x, w = pipe.w;
-  // top
-  ctx.fillStyle = ps.colorTop;
-  drawRoundedRect(x, 0, w, pipe.top, 6);
-  // cap
-  ctx.fillStyle = shade(ps.colorTop, -12);
-  drawRoundedRect(x-6, pipe.top-18, w+12, 18, 8);
-  // bottom
-  ctx.fillStyle = ps.colorBottom;
-  drawRoundedRect(x, pipe.bottom, w, H() - pipe.bottom - 90, 6);
-  // cap bottom
-  ctx.fillStyle = shade(ps.colorBottom, -12);
-  drawRoundedRect(x-6, pipe.bottom, w+12, 18, 8);
-}
-function drawCoinItem(c){
-  const cs = coinSkins.find(s => s.id === state.coinSkin) || coinSkins[0];
-  ctx.save();
-  ctx.translate(c.x, c.y);
-  ctx.rotate(Math.sin(tick*0.007 + c.x*0.0005) * 0.4);
-  // outer
-  ctx.fillStyle = cs.color;
-  ctx.beginPath(); ctx.arc(0,0,c.r,0,Math.PI*2); ctx.fill();
-  // shine
-  ctx.fillStyle = cs.shine;
-  ctx.beginPath(); ctx.arc(-c.r*0.3, -c.r*0.35, c.r*0.45, 0, Math.PI*2); ctx.fill();
-  ctx.restore();
-}
-
-/* ---------------------------
-   Utility color helper: shade HSL string by percent
-   --------------------------- */
-function shade(hslString, percent){
-  // naive parse: "hsl(H S% L%)"
-  try{
-    const m = /hsl\\((\\d+)\\s*(\\d+)%\\s*(\\d+)%\\)/.exec(hslString.replace(/\\s+/g,' '));
-    if(!m) return hslString;
-    let H = parseInt(m[1]), S = parseInt(m[2]), L = parseInt(m[3]);
-    L = Math.max(0, Math.min(100, L + percent));
-    return `hsl(${H} ${S}% ${L}%)`;
-  }catch(e){ return hslString; }
-}
-
-/* ---------------------------
-   Game Logic
-   --------------------------- */
-function resetWorld(){
-  pipes = [];
-  coinsItems = [];
-  particles = [];
-  tick = 0;
-  spawnTimer = 0;
-  speed = 2.6;
-  score = 0;
-  bird.x = birdStartX;
-  bird.y = H()/2;
-  bird.vy = 0;
-  bird.rotation = 0;
-  bird.flapTimer = 0;
-  bird.alive = true;
-  gameState = 'menu';
-  updateHUD();
-}
-resetWorld();
-
-function spawnPipe(){
-  const gap = 150;
-  const minTop = 80;
-  const maxTop = H() - gap - 200;
-  const top = Math.floor(Math.random()*(maxTop-minTop)) + minTop;
-  const w = Math.max(64, Math.min(96, 80 + Math.floor(Math.random()*20)));
-  pipes.push({ x: W() + 20, w, top, bottom: top + gap, scored:false });
-}
-function spawnCoin(){
-  const x = W() + 40;
-  const y = Math.random() * (H()-220) + 120;
-  coinsItems.push({ x, y, r: 12, collected:false });
-}
-
-/* ---------------------------
-   Physics & Update loop
-   --------------------------- */
-let lastTime = performance.now();
-function update(now){
-  const dt = Math.min(40, now - lastTime);
-  lastTime = now;
-  tick += dt;
-  if(gameState === 'playing'){
-    // physics
-    bird.vy += gravity;
-    bird.y += bird.vy;
-    bird.rotation = Math.max(-1.0, Math.min(1.2, bird.vy * 0.06));
-    bird.flapTimer += dt;
-
-    // move pipes
-    for(let i=pipes.length-1;i>=0;i--){
-      pipes[i].x -= speed;
-      // scoring: if passed
-      if(!pipes[i].scored && pipes[i].x + pipes[i].w < bird.x){
-        score++;
-        pipes[i].scored = true;
-      }
-      // remove offscreen
-      if(pipes[i].x + pipes[i].w < -120) pipes.splice(i,1);
-    }
-    // coins move
-    for(let i=coinsItems.length-1;i>=0;i--){
-      coinsItems[i].x -= speed;
-      // collect
-      const c = coinsItems[i];
-      if(!c.collected && dist(bird.x, bird.y, c.x, c.y) < 24){
-        c.collected = true;
-        coins += 1;
-        playSfx(920,0.09,'sine',0.08);
-        saveProgress();
-        coinsItems.splice(i,1);
-      } else if(c.x < -40) coinsItems.splice(i,1);
-    }
-    // spawn logic
-    spawnTimer += dt;
-    if(spawnTimer > spawnInterval){
-      spawnTimer = 0;
-      spawnPipe();
-      if(Math.random() > 0.4) spawnCoin();
-      // slowly increase difficulty
-      speed = Math.min(6.2, speed + 0.02);
-      if(spawnInterval > 900) spawnInterval -= 6;
-    }
-
-    // collision
-    // top/bottom
-    if(bird.y + 20 > H() - 80 || bird.y - 20 < -20){
-      birdDie();
-    }
-    // pipe collision
-    for(const p of pipes){
-      if(circleRectCollision(bird.x, bird.y, 18, p.x, 0, p.w, p.top) ||
-         circleRectCollision(bird.x, bird.y, 18, p.x, p.bottom, p.w, H()-p.bottom)){
-           birdDie();
-      }
-    }
-  } else if(gameState === 'menu'){
-    // gentle idle bob
-    bird.y = H()/2 + Math.sin(tick*0.003) * 8;
-    bird.rotation = Math.sin(tick*0.002) * 0.08;
-  } else if(gameState === 'gameover'){
-    // play death animation (fall)
-    bird.vy += gravity;
-    bird.y += bird.vy;
-    bird.rotation += 0.02;
-  }
-  // particles update (small)
-  for(let i=particles.length-1;i>=0;i--){
-    const p = particles[i];
-    p.x += p.vx;
-    p.y += p.vy;
-    p.vy += 0.14;
-    p.life -= 1;
-    if(p.life <= 0) particles.splice(i,1);
-  }
-
-  // draw
-  render();
-
-  // schedule next
-  requestAnimationFrame(update);
-}
-requestAnimationFrame(update);
-
-/* ---------------------------
-   Rendering
-   --------------------------- */
-function render(){
-  // clear
-  ctx.clearRect(0,0,W(),H());
-  // background gradient
-  const g = ctx.createLinearGradient(0,0,0,H());
-  g.addColorStop(0, '#89d3ff');
-  g.addColorStop(1, '#bfe9ff');
-  ctx.fillStyle = g;
-  ctx.fillRect(0,0,W(),H());
-
-  // parallax clouds
-  drawClouds();
-
-  // ground
-  ctx.fillStyle = 'rgba(15,20,30,0.25)';
-  ctx.fillRect(0,H()-90,W(),90);
-
-  // pipes
-  for(const p of pipes) drawPipe(p);
-
-  // coins
-  for(const c of coinsItems) drawCoinItem(c);
-
-  // particles (dust)
-  for(const p of particles){
-    ctx.fillStyle = `rgba(0,0,0,${p.life/40})`;
-    ctx.beginPath(); ctx.arc(p.x,p.y, Math.max(1,p.life*0.08),0,Math.PI*2); ctx.fill();
-  }
-
-  // score UI center
-  ctx.font = 'bold 42px Inter, system-ui, sans-serif';
-  ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.textAlign = 'center';
-  ctx.fillText(score, W()/2 + 3, 72 + 3);
-  ctx.fillStyle = '#fff';
-  ctx.fillText(score, W()/2, 72);
-
-  // bird
-  drawBirdSprite(bird);
-
-  // HUD update elements
-  coinCountEl.textContent = coins;
-  highscoreEl.textContent = best;
-  const activeSkin = skins.find(s=>s.id === state.activeSkin) || skins[0];
-  activeSkinNameEl.textContent = activeSkin.name;
-  shopCoins.textContent = coins;
-}
-
-/* ---------------------------
-   Clouds drawing
-   --------------------------- */
-function drawClouds(){
-  ctx.save();
-  const w = W(), h = H();
-  ctx.globalAlpha = 0.8;
-  for(let i=0;i<6;i++){
-    const cx = ((tick*0.02) + i*240) % (w+400) - 200;
-    const cy = 80 + (i%2)*30;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, 70, 26, 0, 0, Math.PI*2);
-    ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx+30,cy+8,44,18,0,0,Math.PI*2); ctx.fill();
-  }
-  ctx.restore();
-}
-
-/* ---------------------------
-   Collision helper
-   --------------------------- */
-function circleRectCollision(cx, cy, cr, rx, ry, rw, rh){
-  const testX = Math.max(rx, Math.min(cx, rx+rw));
-  const testY = Math.max(ry, Math.min(cy, ry+rh));
-  const dx = cx - testX;
-  const dy = cy - testY;
-  return (dx*dx + dy*dy) <= (cr*cr);
-}
-function dist(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return Math.sqrt(dx*dx+dy*dy); }
-
-/* ---------------------------
-   Bird actions
-   --------------------------- */
-function flap(){
-  if(gameState === 'menu'){ startGame(); return; }
-  if(gameState !== 'playing') return;
-  bird.vy = flapPower;
-  bird.flapTimer += 1;
-  // small particles
-  particles.push({ x: bird.x-12, y: bird.y+6, vx: -1.5, vy: -1.2, life: 28});
-  playSfx(700 + (Math.random()*120), 0.06, 'triangle', 0.08);
-}
-function birdDie(){
-  if(!bird.alive) return;
-  bird.alive = false;
-  playSfx(160, 0.2, 'sawtooth', 0.12);
-  gameState = 'gameover';
-  lastScoreEl.textContent = score;
-  best = Math.max(best, score);
-  bestScoreEl.textContent = best;
-  // save progress
-  if(best > state.highscore){ state.highscore = best; }
-  state.coins = coins;
-  saveProgress();
-  // show game over overlay after short delay
-  setTimeout(()=>{ gameOver.style.display = 'grid'; }, 600);
-}
-
-/* ---------------------------
-   Input handling
-   --------------------------- */
-document.addEventListener('keydown', (e) => {
-  if(e.repeat) return;
-  if(e.code === 'Space'){
-    if(gameState === 'menu'){ startGame(); return; }
-    if(gameState === 'gameover'){ restartGame(); return; }
-    flap();
-    e.preventDefault();
-  } else if(e.code === 'KeyS'){
-    toggleShop();
-  } else if(e.code === 'KeyP'){
-    togglePause();
-  } else if(e.code === 'KeyM'){
-    toggleMute();
-  } else if(e.code === 'KeyR'){
-    restartGame();
-  } else if(e.code === 'Escape'){
-    // close overlays
-    closeHelp();
-    toggleShop(false);
-    intro.style.display = 'none';
-  }
-});
-
-canvas.addEventListener('pointerdown', (e) => {
-  flap();
-  // resume audio context on user input
-  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-});
-canvas.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, {passive:false});
-
-/* ---------------------------
-   Start / Pause / Restart
-   --------------------------- */
 function startGame(){
-  if(audioCtx === null) ensureAudio();
-  if(!state.muted) startMusic();
-  spawnTimer = 0; spawnInterval = 1500;
-  resetWorld();
-  gameState = 'playing';
-  intro.style.display = 'none';
-  gameOver.style.display = 'none';
-}
-function togglePause(){
-  if(gameState === 'playing'){ gameState = 'paused'; btnPause.textContent = '▶️'; }
-  else if(gameState === 'paused'){ gameState = 'playing'; btnPause.textContent = '⏸'; }
-}
-function restartGame(){
-  // hide overlays and start fresh round
-  gameOver.style.display = 'none';
-  spawnTimer = 0; spawnInterval = 1500;
-  score = 0;
-  bird.vy = 0; bird.x = birdStartX; bird.y = H()/2; bird.alive = true;
-  pipes = []; coinsItems = []; particles = [];
-  gameState = 'playing';
+  showIntro = false;
+  introOverlay.style.display='none';
+  gameRunning=true;
+  birdX = canvas.width/4;
+  birdY = canvas.height/2;
+  birdVY=0;
+  score=0;
+  pipes=[];
+  spawnPipe();
 }
 
-/* ---------------------------
-   Shop UI Building (skins, pipe, coin)
-   --------------------------- */
-function buildShop(){
-  skinGrid.innerHTML = '';
-  skins.forEach(skin => {
-    const el = document.createElement('div'); el.className = 'skin-card';
-    const preview = document.createElement('div'); preview.className = 'preview';
-    // draw small preview with canvas
-    const pv = document.createElement('canvas'); pv.width = 140; pv.height = 70; pv.style.width='100%'; pv.style.height='100%';
-    const pctx = pv.getContext('2d');
-    // background strip
-    pctx.fillStyle = '#0f1720'; pctx.fillRect(0,0,140,70);
-    // body circle
-    pctx.fillStyle = skin.palette.body;
-    pctx.beginPath(); pctx.ellipse(70,36,28,20,0,0,Math.PI*2); pctx.fill();
-    // wing
-    pctx.fillStyle = skin.palette.wing; pctx.beginPath(); pctx.ellipse(58,44,18,12,-0.6,0,Math.PI*2); pctx.fill();
-    // eye
-    pctx.fillStyle = skin.palette.eye; pctx.beginPath(); pctx.arc(84,30,6,0,Math.PI*2); pctx.fill();
-    // beak
-    pctx.fillStyle = skin.palette.beak; pctx.beginPath(); pctx.moveTo(100,34); pctx.lineTo(110,38); pctx.lineTo(100,42); pctx.closePath(); pctx.fill();
-    preview.appendChild(pv);
-    el.appendChild(preview);
-    const name = document.createElement('div'); name.className='meta'; name.textContent = `${skin.name}`;
-    el.appendChild(name);
-    const meta = document.createElement('div'); meta.className='muted'; meta.textContent = `Preis: ${skin.price} 🪙`;
-    el.appendChild(meta);
-    const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px';
-    const btnUse = document.createElement('button'); btnUse.className='ghost'; btnUse.textContent = (state.activeSkin === skin.id ? 'Aktiv' : 'Auswählen');
-    btnUse.disabled = state.activeSkin === skin.id;
-    btnUse.addEventListener('click', ()=>{
-      state.activeSkin = skin.id; saveState(state); updateHUD();
-      // small feedback
-      playSfx(700, 0.06, 'sine', 0.08);
-      buildShop();
-    });
-    const btnBuy = document.createElement('button'); btnBuy.className='cta'; btnBuy.textContent = state.ownedSkins.includes(skin.id)? 'Besitzt' : `Kaufen ${skin.price}🪙`;
-    btnBuy.disabled = state.ownedSkins.includes(skin.id);
-    btnBuy.addEventListener('click', ()=>{
-      if(state.ownedSkins.includes(skin.id)) return;
-      if(coins >= skin.price){
-        coins -= skin.price; state.ownedSkins.push(skin.id); state.coins = coins; saveProgress();
-        playSfx(900, 0.09, 'triangle', 0.09);
-        buildShop();
+function toggleShop(){
+  showShop = !showShop;
+  shopOverlay.style.display = showShop ? 'flex' : 'none';
+  renderShop();
+}
+
+function renderShop(){
+  shopItemsList.innerHTML='';
+  birdSkins.forEach((skin,index)=>{
+    const li = document.createElement('li');
+    li.innerHTML = `<span style='color:${skin.color}'>${skin.name} (${skin.price} Münzen)</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = skin.purchased?'Auswählen':'Kaufen';
+    btn.onclick = ()=>{
+      if(!skin.purchased){
+        if(coins>=skin.price){
+          coins -= skin.price;
+          skin.purchased=true;
+          currentSkin = index;
+          renderShop();
+        }else alert('Nicht genug Münzen!');
       } else {
-        // shake coin element
-        document.getElementById('coinCount').animate([{transform:'translateY(0)'},{transform:'translateY(-6px)'},{transform:'translateY(0)'}], {duration:360});
-        playSfx(200,0.08,'square',0.08);
+        currentSkin = index;
       }
-    });
-    actions.appendChild(btnUse); actions.appendChild(btnBuy);
-    el.appendChild(actions);
-    skinGrid.appendChild(el);
-  });
-
-  // pipe skins
-  pipeGrid.innerHTML = '';
-  pipeSkins.forEach(ps => {
-    const el = document.createElement('div'); el.className='skin-card';
-    const preview = document.createElement('div'); preview.className='preview';
-    const pv = document.createElement('canvas'); pv.width=140; pv.height=70; pv.style.width='100%'; pv.style.height='100%';
-    const pctx = pv.getContext('2d');
-    pctx.fillStyle = ps.colorTop; pctx.fillRect(20,8,40,34);
-    pctx.fillStyle = shade(ps.colorTop, -18); pctx.fillRect(18,0,44,12);
-    pctx.fillStyle = ps.colorBottom; pctx.fillRect(80,28,40,36);
-    pctx.fillStyle = shade(ps.colorBottom, -18); pctx.fillRect(78,28,44,12);
-    preview.appendChild(pv); el.appendChild(preview);
-    const name = document.createElement('div'); name.className='meta'; name.textContent = ps.name; el.appendChild(name);
-    const btn = document.createElement('button'); btn.className='cta'; btn.textContent = (state.pipeSkin === ps.id ? 'Aktiv' : 'Wählen');
-    btn.disabled = state.pipeSkin === ps.id;
-    btn.addEventListener('click', ()=>{ state.pipeSkin = ps.id; saveState(state); buildShop(); playSfx(500,0.06,'sine',0.07); });
-    el.appendChild(btn);
-    pipeGrid.appendChild(el);
-  });
-
-  // coin skins
-  coinGrid.innerHTML = '';
-  coinSkins.forEach(cs => {
-    const el = document.createElement('div'); el.className='skin-card';
-    const preview = document.createElement('div'); preview.className='preview';
-    const pv = document.createElement('canvas'); pv.width=140; pv.height=70; pv.style.width='100%'; pv.style.height='100%';
-    const pctx = pv.getContext('2d');
-    pctx.fillStyle = cs.color; pctx.beginPath(); pctx.arc(70,36,18,0,Math.PI*2); pctx.fill();
-    pctx.fillStyle = cs.shine; pctx.beginPath(); pctx.arc(63,31,8,0,Math.PI*2); pctx.fill();
-    preview.appendChild(pv); el.appendChild(preview);
-    const name = document.createElement('div'); name.className='meta'; name.textContent = cs.name; el.appendChild(name);
-    const btn = document.createElement('button'); btn.className='cta'; btn.textContent = (state.coinSkin === cs.id ? 'Aktiv' : 'Wählen');
-    btn.disabled = state.coinSkin === cs.id;
-    btn.addEventListener('click', ()=>{ state.coinSkin = cs.id; saveState(state); buildShop(); playSfx(760,0.06,'sine',0.07); });
-    el.appendChild(btn);
-    coinGrid.appendChild(el);
+    };
+    li.appendChild(btn);
+    shopItemsList.appendChild(li);
   });
 }
-buildShop();
 
-/* ---------------------------
-   Helpers: save progress and update HUD
-   --------------------------- */
-function saveProgress(){
-  state.coins = coins;
-  state.highscore = Math.max(state.highscore || 0, best);
-  state.ownedSkins = state.ownedSkins || [];
-  state.activeSkin = state.activeSkin || skins[0].id;
-  state.pipeSkin = state.pipeSkin || pipeSkins[0].id;
-  state.coinSkin = state.coinSkin || coinSkins[0].id;
-  saveState(state);
-  updateHUD();
-}
-function updateHUD(){
-  coinCountEl.textContent = coins;
-  highscoreEl.textContent = best;
-  const active = skins.find(s=>s.id===state.activeSkin);
-  activeSkinNameEl.textContent = active ? active.name : 'Classic';
-  shopCoins.textContent = coins;
+// Pipes
+function spawnPipe(){
+  let pipeY = Math.random()*(canvas.height-pipeGap-100)+50;
+  pipes.push({x:canvas.width, y:pipeY});
 }
 
-/* ---------------------------
-   Toggling shop/help
-   --------------------------- */
-function toggleShop(force){
-  if(typeof force === 'boolean'){
-    if(force) { shopEl.style.display = 'grid'; } else { shopEl.style.display = 'none'; }
-  } else {
-    shopEl.style.display = (shopEl.style.display === 'none' || shopEl.style.display === '') ? 'grid' : 'none';
+// Game loop
+function gameLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  if(gameRunning){
+    // Bird physics
+    birdVY+=gravity;
+    birdY+=birdVY;
+
+    // Draw bird
+    const skin = birdSkins[currentSkin];
+    ctx.fillStyle = skin.color;
+    if(skin.shape==='circle') ctx.beginPath(),ctx.arc(birdX,birdY,20,0,Math.PI*2),ctx.fill();
+    else if(skin.shape==='triangle') ctx.beginPath(),ctx.moveTo(birdX,birdY-20),ctx.lineTo(birdX-20,birdY+20),ctx.lineTo(birdX+20,birdY+20),ctx.fill();
+
+    // Pipes
+    for(let i=pipes.length-1;i>=0;i--){
+      const p = pipes[i];
+      p.x-=pipeSpeed;
+      ctx.fillStyle='green';
+      ctx.fillRect(p.x,0,pipeWidth,p.y);
+      ctx.fillRect(p.x,p.y+pipeGap,pipeWidth,canvas.height);
+
+      // Coin in gap
+      ctx.fillStyle='gold';
+      ctx.beginPath();
+      ctx.arc(p.x+pipeWidth/2,p.y+pipeGap/2,10,0,Math.PI*2);
+      ctx.fill();
+      // Collect coin
+      if(Math.abs((p.x+pipeWidth/2)-birdX)<20 && Math.abs((p.y+pipeGap/2)-birdY)<20){
+        coins++;
+        p.y=-1000; // Remove coin after collection
+      }
+
+      // Collision
+      if(birdX+20>p.x && birdX-20<p.x+pipeWidth && (birdY-20<p.y || birdY+20>p.y+pipeGap)){
+        gameOver();
+      }
+
+      if(p.x+pipeWidth<0) pipes.splice(i,1);
+    }
+
+    // Spawn new pipe
+    if(pipes.length===0 || pipes[pipes.length-1].x<canvas.width-300) spawnPipe();
+
+    // Score
+    ctx.fillStyle='white';
+    ctx.font='30px sans-serif';
+    ctx.fillText(`Score: ${score}`,20,50);
+    ctx.fillText(`Münzen: ${coins}`,20,90);
+    score++;
   }
-  buildShop();
-  // ensure overlays hide others
-  if(shopEl.style.display === 'grid'){
-    intro.style.display = 'none';
-    helpEl.style.display = 'none';
-    gameOver.style.display = 'none';
+
+  requestAnimationFrame(gameLoop);
+}
+
+function flap(){
+  if(!showIntro && !showShop) birdVY=flapStrength;
+}
+
+function gameOver(){
+  gameRunning=false;
+  if(score>highScore){
+    highScore=score;
+    localStorage.setItem('flappyHighScore',highScore);
   }
-}
-function closeHelp(){ helpEl.style.display = 'none'; }
-
-/* ---------------------------
-   small color helper (already used above)
-   --------------------------- */
-function shade(hslString, percent){
-  try{
-    const m = /hsl\\((\\d+)\\s*(\\d+)%\\s*(\\d+)%\\)/.exec(hslString.replace(/\\s+/g,' '));
-    if(!m) return hslString;
-    let H = parseInt(m[1]), S = parseInt(m[2]), L = parseInt(m[3]);
-    L = Math.max(0, Math.min(100, L + percent));
-    return `hsl(${H} ${S}% ${L}%)`;
-  }catch(e){ return hslString; }
+  alert(`Game Over! Score: ${score} | Highscore: ${highScore}`);
+  startGame();
 }
 
-/* ---------------------------
-   Initial HUD & Load
-   --------------------------- */
-updateHUD();
-
-/* ---------------------------
-   Ensure audio on first user gesture (resume)
-   --------------------------- */
-document.addEventListener('pointerdown', function ensure(){
-  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-  document.removeEventListener('pointerdown', ensure);
+// Controls
+document.addEventListener('keydown',(e)=>{
+  if(e.code==='Space'){ flap(); if(showIntro) startGame(); }
+  if(e.code==='KeyS' && !showIntro) toggleShop();
+  if(e.code==='Escape'){ showIntro=false; introOverlay.style.display='none'; showShop=false; shopOverlay.style.display='none'; }
+  if(e.code==='KeyM'){ musicOn=!musicOn; bgMusic.volume=musicOn?0.2:0; }
 });
 
-/* ---------------------------
-   Final touches: show intro overlay initially unless starting
-   --------------------------- */
-intro.style.display = 'grid';
-gameOver.style.display = 'none';
-shopEl.style.display = 'none';
-helpEl.style.display = 'none';
+// Buttons
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('closeIntroBtn').addEventListener('click', startGame);
+document.getElementById('closeShopBtn').addEventListener('click',()=>{ showShop=false; shopOverlay.style.display='none'; });
 
-/* ---------------------------
-   End of file
-   --------------------------- */
+// Start loop
+gameLoop();
 </script>
 </body>
 </html>
