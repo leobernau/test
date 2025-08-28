@@ -1,416 +1,310 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Flappy Bird – Birthday Edition</title>
+  <meta charset="UTF-8" />
+  <title>Flappy Bird Deluxe</title>
   <style>
-    :root{
-      --bg1:#74ebd5; /* default gradient top */
-      --bg2:#ACB6E5; /* default gradient bottom */
-      --ui:#0f172a;  /* slate-900 */
-      --ui-2:#1f2937; /* gray-800 */
-      --accent:#22c55e; /* green-500 */
-      --pipe:#16a34a;
-      --bird:#f59e0b;
-      --coin:#fbbf24;
+    body { margin:0; overflow:hidden; font-family:sans-serif; background:#222; color:white; }
+    canvas { display:block; margin:0 auto; background:skyblue; }
+
+    .overlay {
+      position:absolute;
+      top:0; left:0;
+      width:100%; height:100%;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      background:rgba(0,0,0,0.7);
+      z-index:10;
+      flex-direction:column;
+      color:white;
+      text-align:center;
+      padding:20px;
     }
-    html,body{
-      margin:0; height:100%; font-family:system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background: linear-gradient(180deg,var(--bg1), var(--bg2));
-      color:#fff; overflow:hidden;
+    .overlay button {
+      margin-top:15px;
+      padding:10px 20px;
+      border:none;
+      border-radius:8px;
+      background:#ffcc00;
+      font-size:16px;
+      cursor:pointer;
     }
-    #wrap{ position:fixed; inset:0; display:grid; place-items:center; }
-    canvas{ width:min(100vw, 560px); height:min(100vh, 900px); max-height:100vh; image-rendering:pixelated; }
-    .hud{ position:fixed; inset:0; pointer-events:none; }
-    .topbar{ position:absolute; top:8px; left:8px; right:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .pill{ background:rgba(15, 23, 42, .6); backdrop-filter:saturate(120%) blur(4px); border:1px solid rgba(255,255,255,.15); padding:.5rem .75rem; border-radius:999px; display:flex; align-items:center; gap:.5rem; pointer-events:auto; }
-    .btn{ cursor:pointer; user-select:none; transition:.15s transform ease, .2s opacity ease; }
-    .btn:active{ transform:scale(.96); }
-    .group{ display:flex; gap:.5rem; }
-    .center-modal{ position:absolute; inset:0; display:grid; place-items:center; }
-    .card{ background:rgba(15, 23, 42, .75); border:1px solid rgba(255,255,255,.2); border-radius:1rem; padding:1rem; width:min(92vw,560px); box-shadow:0 20px 60px rgba(0,0,0,.25); pointer-events:auto; }
-    h1{ margin:.25rem 0 .5rem; font-size:clamp(24px, 4vw, 36px); letter-spacing:.5px; }
-    p{ margin:.25rem 0; opacity:.9 }
-    .grid{ display:grid; gap:.75rem; }
-    .row{ display:flex; gap:.5rem; align-items:center; justify-content:space-between; }
-    .row .btn{ background:#fff; color:#111; padding:.5rem .75rem; border-radius:.75rem; font-weight:600; }
-    .row .btn.secondary{ background:transparent; color:#fff; border:1px solid rgba(255,255,255,.3) }
-    .store{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:.75rem; margin-top:.5rem; }
-    .skin{ background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2); border-radius:.75rem; padding:.5rem; display:grid; gap:.35rem; }
-    .skin .thumb{ border-radius:.5rem; height:78px; display:grid; place-items:center; position:relative; overflow:hidden; }
-    .skin .name{ font-weight:600; font-size:.95rem }
-    .skin .meta{ font-size:.8rem; opacity:.85 }
-    .skin .action{ margin-top:.35rem; display:flex; gap:.4rem; }
-    .skin .action .btn{ flex:1; text-align:center; padding:.4rem .5rem; border-radius:.5rem; font-weight:700 }
-    .muted{ opacity:.7 }
-    .tag{ background:rgba(255,255,255,.15); padding:.15rem .4rem; border-radius:.35rem; font-size:.75rem }
-    .foot{ font-size:.85rem; opacity:.8; text-align:center; margin-top:.5rem }
-    .kbd{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:rgba(255,255,255,.15); padding:.1rem .35rem; border-radius:.35rem }
+    .close-btn {
+      position:absolute;
+      top:10px;
+      right:20px;
+      background:#ff4444;
+      border:none;
+      border-radius:50%;
+      width:30px; height:30px;
+      color:white;
+      font-weight:bold;
+      cursor:pointer;
+    }
+    #hud {
+      position:absolute;
+      top:10px;
+      left:10px;
+      font-size:20px;
+      background:rgba(0,0,0,0.3);
+      padding:5px 10px;
+      border-radius:8px;
+    }
   </style>
 </head>
 <body>
-  <div id="wrap"><canvas id="game" width="560" height="900" aria-label="Flappy Bird Canvas"></canvas></div>
-  <div class="hud" aria-live="polite">
-    <div class="topbar">
-      <div class="pill group">
-        <div id="coinDisplay">🪙 0</div>
-        <div class="tag">Highscore: <span id="hs">0</span></div>
-        <div class="tag">Skin: <span id="skinName">Classic</span></div>
-      </div>
-      <div class="pill group">
-        <div class="btn" id="btnPause" title="Pause (P)">⏸️</div>
-        <div class="btn" id="btnMute" title="Ton an/aus (M)">🔊</div>
-        <div class="btn" id="btnShop" title="Shop (S)">🛍️</div>
-        <div class="btn" id="btnHelp" title="Hilfe (H)">❓</div>
-      </div>
-    </div>
+  <canvas id="gameCanvas" width="480" height="640"></canvas>
 
-    <div class="center-modal" id="menu">
-      <div class="card grid">
-        <h1>🎉 Flappy Bird – Birthday Edition</h1>
-        <p>Drücke <span class="kbd">Leertaste</span> oder tippe, um zu flappen. Sammle <b>🪙 Münzen</b>, weiche Röhren aus und schalte Skins frei!</p>
-        <div class="row">
-          <div class="btn" id="btnPlay">▶️ Spielen</div>
-          <div class="btn secondary" id="btnOpenShop">🛍️ Shop</div>
-        </div>
-        <div class="foot">Shortcuts: <span class="kbd">Leertaste</span> Flap · <span class="kbd">P</span> Pause · <span class="kbd">M</span> Ton · <span class="kbd">R</span> Neustart · <span class="kbd">S</span> Shop</div>
-      </div>
-    </div>
+  <div id="hud">Münzen: <span id="coins">0</span> | Highscore: <span id="highscore">0</span></div>
 
-    <div class="center-modal" id="shop" hidden>
-      <div class="card">
-        <div class="row">
-          <h1>🛍️ Skins & Themes</h1>
-          <div class="pill">Münzen: <b id="coinsInShop">0</b></div>
-        </div>
-        <div class="store" id="skinStore"></div>
-        <div class="foot"><button class="btn secondary" id="btnCloseShop">Zurück</button></div>
-      </div>
-    </div>
-
-    <div class="center-modal" id="help" hidden>
-      <div class="card grid">
-        <h1>Hilfe</h1>
-        <p>• <b>Leertaste/Tap:</b> Flap · <b>P:</b> Pause · <b>M:</b> Ton · <b>S:</b> Shop · <b>R:</b> Neustart</p>
-        <p>• Sammle Münzen, um neue <b>Skins</b> freizuschalten. Dein Fortschritt wird lokal gespeichert.</p>
-        <div class="row"><div class="btn secondary" id="btnCloseHelp">Schließen</div></div>
-      </div>
-    </div>
+  <!-- Intro Overlay -->
+  <div id="introOverlay" class="overlay">
+    <button class="close-btn" id="closeIntroBtn">X</button>
+    <h1>Willkommen zu Flappy Bird Deluxe 🎉</h1>
+    <p>Drücke die <b>Leertaste</b>, um loszufliegen!</p>
+    <p>Mit <b>S</b> öffnest/schließt du den Shop.<br>Mit <b>P</b> pausierst du.<br>Mit <b>M</b> schaltest du Musik an/aus.</p>
+    <button id="startBtn">OK, los geht’s!</button>
   </div>
 
-<script>
-(() => {
-  // --- Utilities & Persistence ---
-  const storageKey = 'flappy_birthday_v1';
-  const save = (data) => localStorage.setItem(storageKey, JSON.stringify(data));
-  const load = () => {
-    try{ return JSON.parse(localStorage.getItem(storageKey)) || {} } catch(e){ return {} }
-  };
+  <!-- Shop Overlay -->
+  <div id="shopOverlay" class="overlay" style="display:none">
+    <button class="close-btn" id="closeShopBtn">X</button>
+    <h2>🛒 Shop</h2>
+    <p>Kaufe Skins mit deinen Münzen!</p>
+    <ul id="shopItems"></ul>
+  </div>
 
-  // --- Audio (simple beeps via WebAudio) ---
-  let audioEnabled = true;
-  let audioCtx = null;
-  function beep({freq=440, dur=0.07, type='sine', vol=0.08}){
-    if(!audioEnabled) return;
-    try{
-      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      const t0 = audioCtx.currentTime;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = type; osc.frequency.value = freq;
-      gain.gain.value = 0; gain.gain.linearRampToValueAtTime(vol, t0+0.01);
-      gain.gain.linearRampToValueAtTime(0.0001, t0+dur);
-      osc.connect(gain).connect(audioCtx.destination); osc.start(); osc.stop(t0+dur+0.02);
-    }catch(e){}
-  }
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-  // --- Skins ---
-  const SKINS = [
-    { id:'classic', name:'Classic', price:0,  bird:'#f59e0b', pipe:'#16a34a', bg1:'#74ebd5', bg2:'#ACB6E5', coin:'#fbbf24' },
-    { id:'sunset',  name:'Sunset',  price:30, bird:'#fb7185', pipe:'#fb923c', bg1:'#fda085', bg2:'#f6d365', coin:'#fde68a' },
-    { id:'neon',    name:'Neon',    price:60, bird:'#22d3ee', pipe:'#a78bfa', bg1:'#0ea5e9', bg2:'#1e293b', coin:'#67e8f9' },
-    { id:'forest',  name:'Forest',  price:40, bird:'#86efac', pipe:'#22c55e', bg1:'#134e4a', bg2:'#052e2b', coin:'#bbf7d0' },
-    { id:'void',    name:'Void',    price:80, bird:'#e879f9', pipe:'#7c3aed', bg1:'#111827', bg2:'#000000', coin:'#f472b6' },
-  ];
+    // ===== Game state =====
+    let gameRunning = false;
+    let paused = false;
+    let showIntro = true;
+    let showShop = false;
 
-  // --- Game Setup ---
-  const canvas = document.getElementById('game');
-  const ctx = canvas.getContext('2d');
-  const DPR = Math.max(1, Math.floor(window.devicePixelRatio||1));
+    // Bird
+    let birdY = canvas.height/2;
+    let birdVY = 0;
+    const gravity = 0.5;
+    const flapStrength = -8;
+    const birdX = 100;
 
-  function fitCanvas(){
-    const w = 560, h = 900; // logical size
-    canvas.width = w * DPR;
-    canvas.height = h * DPR;
-    ctx.setTransform(DPR,0,0,DPR,0,0);
-  }
-  fitCanvas();
-  window.addEventListener('resize', fitCanvas);
+    // Pipes
+    let pipes = [];
+    const pipeGap = 140;
+    const pipeWidth = 60;
+    let pipeSpeed = 2.5;
+    let frameCount = 0;
 
-  // --- DOM Elements ---
-  const $ = (sel)=>document.querySelector(sel);
-  const menu = $('#menu');
-  const shop = $('#shop');
-  const help = $('#help');
-  const btnPlay = $('#btnPlay');
-  const btnOpenShop = $('#btnOpenShop');
-  const btnCloseShop = $('#btnCloseShop');
-  const btnPause = $('#btnPause');
-  const btnMute = $('#btnMute');
-  const btnShop = $('#btnShop');
-  const btnHelp = $('#btnHelp');
-  const btnCloseHelp = $('#btnCloseHelp');
-  const hsEl = $('#hs');
-  const coinDisplay = $('#coinDisplay');
-  const coinsInShop = $('#coinsInShop');
-  const storeEl = $('#skinStore');
-  const skinNameEl = $('#skinName');
+    // Coins & Score
+    let coins = parseInt(localStorage.getItem("coins")||"0");
+    let highscore = parseInt(localStorage.getItem("highscore")||"0");
+    let score = 0;
 
-  // --- State ---
-  const State = { MENU:0, PLAY:1, PAUSE:2, GAMEOVER:3 };
-  let gameState = State.MENU;
-  let score=0, highScore=0, coins=0;
-  let player=null, pipes=[], particles=[], coinItems=[];
-  let time=0, spawnTimer=0, coinTimer=0, speed=2.75;
-  let worldShift=0;
-  let selectedSkin='classic';
-  let unlocked = new Set(['classic']);
+    // Skins
+    const skins = [
+      {name:"Classic", color:"yellow", price:0},
+      {name:"Sunset", color:"orange", price:10},
+      {name:"Neon", color:"lime", price:20},
+      {name:"Forest", color:"green", price:30},
+      {name:"Void", color:"purple", price:50}
+    ];
+    let ownedSkins = JSON.parse(localStorage.getItem("ownedSkins")||"[\"Classic\"]");
+    let activeSkin = localStorage.getItem("activeSkin")||"Classic";
 
-  // Load persistence
-  const persisted = load();
-  if(persisted.highScore) highScore = persisted.highScore;
-  if(persisted.coins) coins = persisted.coins;
-  if(persisted.unlocked) unlocked = new Set(persisted.unlocked);
-  if(persisted.selectedSkin) selectedSkin = persisted.selectedSkin;
-  updateSkin(selectedSkin);
-  updateHUD();
-
-  function persist(){
-    save({ highScore, coins, unlocked:[...unlocked], selectedSkin });
-  }
-
-  function updateHUD(){
-    hsEl.textContent = highScore;
-    coinDisplay.textContent = `🪙 ${coins}`;
-    coinsInShop.textContent = coins;
-    skinNameEl.textContent = (SKINS.find(s=>s.id===selectedSkin)||SKINS[0]).name;
-  }
-
-  function updateSkin(id){
-    const s = SKINS.find(x=>x.id===id) || SKINS[0];
-    document.documentElement.style.setProperty('--bg1', s.bg1);
-    document.documentElement.style.setProperty('--bg2', s.bg2);
-    document.documentElement.style.setProperty('--pipe', s.pipe);
-    document.documentElement.style.setProperty('--bird', s.bird);
-    document.documentElement.style.setProperty('--coin', s.coin);
-  }
-
-  // --- Entities ---
-  function reset(){
-    score=0; speed=2.75; worldShift=0; time=0; spawnTimer=0; coinTimer=0;
-    pipes.length=0; particles.length=0; coinItems.length=0;
-    player = { x:140, y:450, vy:0, r:18, alive:true, rot:0 };
-  }
-
-  function flap(){
-    if(gameState!==State.PLAY) return;
-    player.vy = -6.6; // jump
-    player.rot = -0.35;
-    particles.push({x:player.x-14,y:player.y+8,vx:-2,vy:.2,life:18});
-    beep({freq:700,dur:.05,type:'triangle',vol:0.08});
-  }
-
-  function spawnPipe(){
-    const gap = 160; // pixels
-    const minY = 160, maxY = canvas.height/DPR - 260;
-    const top = Math.random()*(maxY-minY)+minY;
-    const w = 74; // pipe width
-    const x = canvas.width/DPR + w;
-    pipes.push({ x, w, top: top-gap/2, bottom: top+gap/2, scored:false });
-  }
-
-  function spawnCoin(){
-    const x = canvas.width/DPR + 30;
-    const y = Math.random()* (canvas.height/DPR - 280) + 140;
-    coinItems.push({x, y, r:10, collected:false});
-  }
-
-  function circleRectCollision(cx,cy,cr, rx,ry,rw,rh){
-    const testX = Math.max(rx, Math.min(cx, rx+rw));
-    const testY = Math.max(ry, Math.min(cy, ry+rh));
-    const dx=cx-testX, dy=cy-testY;
-    return (dx*dx + dy*dy) <= cr*cr;
-  }
-
-  // --- Rendering helpers ---
-  function drawBird(b){
-    const color = getComputedStyle(document.documentElement).getPropertyValue('--bird');
-    ctx.save();
-    ctx.translate(b.x, b.y);
-    ctx.rotate(b.rot);
-    // body
-    ctx.fillStyle=color; ctx.strokeStyle='rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.arc(0,0,b.r,0,Math.PI*2); ctx.fill();
-    // wing
-    ctx.beginPath(); ctx.fillStyle='rgba(0,0,0,.15)';
-    ctx.ellipse(-4,4,b.r*0.7,b.r*0.45, -0.4, 0, Math.PI*2); ctx.fill();
-    // eye
-    ctx.beginPath(); ctx.fillStyle='#fff'; ctx.arc(6,-6, b.r*0.28, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.fillStyle='#111'; ctx.arc(7,-6, b.r*0.15, 0, Math.PI*2); ctx.fill();
-    // beak
-    ctx.fillStyle='#fcd34d'; ctx.beginPath(); ctx.moveTo(b.r*.5,0); ctx.lineTo(b.r*1.2,4); ctx.lineTo(b.r*.5,8); ctx.closePath(); ctx.fill();
-    ctx.restore();
-  }
-
-  function drawPipe(x, top, bottom, w){
-    const color = getComputedStyle(document.documentElement).getPropertyValue('--pipe');
-    ctx.fillStyle = color; ctx.strokeStyle = 'rgba(0,0,0,.2)';
-    // top pipe
-    ctx.fillRect(x, 0, w, top);
-    ctx.fillRect(x-6, top-24, w+12, 24); // cap
-    // bottom pipe
-    ctx.fillRect(x, bottom, w, canvas.height/DPR - bottom);
-    ctx.fillRect(x-6, bottom, w+12, 24); // cap
-  }
-
-  function drawCoin(c){
-    const color = getComputedStyle(document.documentElement).getPropertyValue('--coin');
-    ctx.save();
-    ctx.translate(c.x, c.y);
-    ctx.rotate(Math.sin(time*0.2 + c.x*0.01)*0.12);
-    ctx.fillStyle = color; ctx.strokeStyle='rgba(0,0,0,.25)';
-    ctx.beginPath(); ctx.arc(0,0,c.r,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(-3,-3,c.r*0.5,0,Math.PI*2); ctx.fill();
-    ctx.restore();
-  }
-
-  function drawBackground(){
-    // simple clouds and parallax ground
-    const W = canvas.width/DPR, H = canvas.height/DPR;
-    ctx.save();
-    ctx.globalAlpha = .6;
-    ctx.fillStyle='rgba(255,255,255,.8)';
-    for(let i=0;i<6;i++){
-      const x = (i*220 - (worldShift*0.5)%220);
-      const y = 90 + (i%2)*30;
-      ctx.beginPath(); ctx.ellipse(x, y, 60, 20, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x+30, y+8, 40, 16, 0, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(x-30, y+12, 36, 14, 0, 0, Math.PI*2); ctx.fill();
+    // Audio (optional simple beeps)
+    function playBeep(freq){
+      try{
+        const ctxAudio = new (window.AudioContext||window.webkitAudioContext)();
+        const osc = ctxAudio.createOscillator();
+        const gain = ctxAudio.createGain();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(freq, ctxAudio.currentTime);
+        gain.gain.setValueAtTime(0.05, ctxAudio.currentTime);
+        osc.connect(gain);
+        gain.connect(ctxAudio.destination);
+        osc.start();
+        osc.stop(ctxAudio.currentTime+0.1);
+      } catch(e) {}
     }
-    ctx.restore();
 
-    // ground
-    ctx.fillStyle='rgba(0,0,0,.15)';
-    ctx.fillRect(0, H-90, W, 90);
-    ctx.fillStyle='rgba(255,255,255,.1)';
-    for(let i=0;i<Math.ceil(W/40)+2;i++){
-      const x = (i*40 - worldShift%40);
-      ctx.fillRect(x, H-90, 20, 6);
+    // ===== Rendering =====
+    function drawBird(){
+      ctx.fillStyle = skins.find(s=>s.name===activeSkin).color;
+      ctx.beginPath();
+      ctx.arc(birdX,birdY,20,0,Math.PI*2);
+      ctx.fill();
     }
-  }
 
-  // --- Game Loop ---
-  let last=performance.now();
-  function loop(now){
-    const dt = Math.min(32, now-last); last=now; time+=dt; // ms
+    function drawPipes(){
+      ctx.fillStyle = "green";
+      pipes.forEach(pipe => {
+        ctx.fillRect(pipe.x,0,pipeWidth,pipe.top);
+        ctx.fillRect(pipe.x,pipe.top+pipeGap,pipeWidth,canvas.height);
+        if(pipe.coin){
+          ctx.fillStyle="gold";
+          ctx.beginPath();
+          ctx.arc(pipe.x+pipeWidth/2,pipe.top+pipeGap/2,10,0,Math.PI*2);
+          ctx.fill();
+          ctx.fillStyle="green";
+        }
+      });
+    }
 
-    ctx.clearRect(0,0,canvas.width/DPR, canvas.height/DPR);
-    drawBackground();
+    function resetGame(){
+      birdY = canvas.height/2;
+      birdVY = 0;
+      pipes=[];
+      score=0;
+      frameCount=0;
+    }
 
-    if(gameState===State.PLAY){
-      // physics
-      player.vy += 0.33; // gravity
-      player.y += player.vy;
-      player.rot = Math.min(1.0, player.rot + 0.03);
+    // ===== Game Loop =====
+    function gameLoop(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
 
-      worldShift += speed;
-      spawnTimer += dt; coinTimer += dt;
-      if(spawnTimer>1400){ spawnTimer=0; spawnPipe(); speed = Math.min(6.2, speed+0.04); }
-      if(coinTimer>900){ coinTimer=0; if(Math.random()<0.8) spawnCoin(); }
+      if(gameRunning && !paused){
+        frameCount++;
 
-      // move & draw pipes
-      for(let i=pipes.length-1;i>=0;i--){
-        const p=pipes[i]; p.x -= speed;
-        drawPipe(p.x, p.top, p.bottom, p.w);
-        // score when passed
-        if(!p.scored && p.x + p.w < player.x - player.r){ score++; p.scored=true; beep({freq:520,dur:.04,type:'square',vol:0.06}); }
-        if(p.x + p.w < -120) pipes.splice(i,1);
-        // collision
-        if(circleRectCollision(player.x,player.y,player.r, p.x,0,p.w,p.top) || circleRectCollision(player.x,player.y,player.r, p.x,p.bottom,p.w, canvas.height/DPR - p.bottom)){
-          die();
+        // Bird physics
+        birdVY += gravity;
+        birdY += birdVY;
+
+        // Pipes logic
+        if(frameCount%100===0){
+          const top = Math.random()* (canvas.height- pipeGap-100)+50;
+          pipes.push({x:canvas.width, top:top, coin:true});
+        }
+        pipes.forEach(pipe=>{
+          pipe.x -= pipeSpeed;
+        });
+        pipes = pipes.filter(p=>p.x+pipeWidth>0);
+
+        // Collisions
+        pipes.forEach(pipe=>{
+          if(birdX+20>pipe.x && birdX-20<pipe.x+pipeWidth){
+            if(birdY-20<pipe.top || birdY+20>pipe.top+pipeGap){
+              gameRunning=false;
+              if(score>highscore){
+                highscore=score;
+                localStorage.setItem("highscore",highscore);
+              }
+            }
+          }
+          // coin collect
+          if(pipe.coin && birdX>pipe.x && birdX<pipe.x+pipeWidth && Math.abs(birdY-(pipe.top+pipeGap/2))<20){
+            coins++;
+            playBeep(600);
+            pipe.coin=false;
+            localStorage.setItem("coins",coins);
+          }
+        });
+
+        if(birdY>canvas.height||birdY<0){
+          gameRunning=false;
+        }
+
+        // Score update
+        if(frameCount%50===0){
+          score++;
         }
       }
 
-      // coins
-      for(let i=coinItems.length-1;i>=0;i--){
-        const c = coinItems[i]; c.x -= speed;
-        drawCoin(c);
-        if(!c.collected && Math.hypot(player.x-c.x, player.y-c.y) < player.r + c.r){
-          c.collected=true; coins += 1; coinItems.splice(i,1); updateHUD(); persist();
-          particles.push({x:c.x,y:c.y,vx:-1.2,vy:-1.8,life:28});
-          beep({freq:880,dur:.09,type:'sine',vol:0.09});
-        }
-        if(c.x < -40) coinItems.splice(i,1);
-      }
+      drawPipes();
+      drawBird();
 
-      // floor/ceiling
-      const H = canvas.height/DPR;
-      if(player.y < -20) player.y = -20;
-      if(player.y + player.r > H-90){ die(); }
+      document.getElementById("coins").innerText=coins;
+      document.getElementById("highscore").innerText=highscore;
 
-      // particles
-      for(let i=particles.length-1;i>=0;i--){
-        const p = particles[i]; p.x+=p.vx; p.y+=p.vy; p.vy+=0.06; p.life-=1; ctx.globalAlpha=Math.max(0,p.life/28);
-        ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
-        if(p.life<=0) particles.splice(i,1);
-      }
-
-      // UI score
-      ctx.fillStyle='rgba(0,0,0,.35)'; ctx.font='bold 42px system-ui'; ctx.textAlign='center';
-      ctx.fillText(`${score}`, canvas.width/DPR/2, 70);
-
-      drawBird(player);
-    } else {
-      // idle bird bounce on menus
-      if(!player) reset();
-      player.y += Math.sin(time*0.004)*0.4; drawBird(player);
-      // tiny pipe preview
-      ctx.globalAlpha=.8; drawPipe(canvas.width/DPR-180, 320, 480, 60); ctx.globalAlpha=1;
-      ctx.fillStyle='rgba(0,0,0,.4)'; ctx.font='bold 28px system-ui'; ctx.textAlign='center';
-      if(gameState===State.GAMEOVER){ ctx.fillText('Game Over – R zum Neustarten', canvas.width/DPR/2, 110); }
+      requestAnimationFrame(gameLoop);
     }
 
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
+    gameLoop();
 
-  function die(){
-    if(gameState!==State.PLAY) return; gameState=State.GAMEOVER;
-    beep({freq:110,dur:.18,type:'sawtooth',vol:0.09});
-    particles.push({x:player.x,y:player.y,vx:-1.2,vy:-2.2,life:40});
-    highScore = Math.max(highScore, score); persist(); updateHUD();
-    menu.hidden=false; // show menu overlay as game over screen
-  }
+    // ===== Shop =====
+    const shopOverlay = document.getElementById("shopOverlay");
+    const shopItems = document.getElementById("shopItems");
 
-  function play(){
-    reset(); gameState = State.PLAY; menu.hidden=true; shop.hidden=true; help.hidden=true;
-  }
+    function renderShop(){
+      shopItems.innerHTML="";
+      skins.forEach(skin=>{
+        const li=document.createElement("li");
+        if(ownedSkins.includes(skin.name)){
+          li.innerHTML=`${skin.name} <button ${skin.name===activeSkin?"disabled":""}>${skin.name===activeSkin?"Aktiv":"Aktivieren"}</button>`;
+          li.querySelector("button").onclick=()=>{
+            activeSkin=skin.name;
+            localStorage.setItem("activeSkin",activeSkin);
+            renderShop();
+          };
+        } else {
+          li.innerHTML=`${skin.name} - ${skin.price} Münzen <button>Kaufen</button>`;
+          li.querySelector("button").onclick=()=>{
+            if(coins>=skin.price){
+              coins-=skin.price;
+              ownedSkins.push(skin.name);
+              localStorage.setItem("coins",coins);
+              localStorage.setItem("ownedSkins",JSON.stringify(ownedSkins));
+              renderShop();
+            } else {
+              alert("Nicht genug Münzen!");
+            }
+          };
+        }
+        shopItems.appendChild(li);
+      });
+    }
 
-  // --- Shop rendering ---
-  function renderShop(){
-    storeEl.innerHTML = '';
-    SKINS.forEach(s => {
-      const unlockedFlag = unlocked.has(s.id);
-      const el = document.createElement('div'); el.className='skin';
-      const thumb = document.createElement('div'); thumb.className='thumb'; thumb.style.background = `linear-gradient(180deg, ${s.bg1}, ${s.bg2})`;
-      // draw a mini preview canvas
-      const pv = document.createElement('canvas'); pv.width=140; pv.height=78; const pctx = pv.getContext('2d');
-      // pipes
-      pctx.fillStyle=s.pipe; pctx.fillRect(88,0,18,38); pctx.fillRect(82,38,30,8);
-      pctx.fillRect(20,50,18,28); pctx.fillRect(14,50,30,8);
-      // bird
-      pctx.save(); pctx.translate(54,38); pctx.fillStyle=s.bird; pctx.beginPath(); pctx.arc(0,0,12,0,Math.PI*2); pctx.fill(); pctx.restore();
+    // ===== Overlay Controls =====
+    const introOverlay = document.getElementById("introOverlay");
+    function startGame(){
+      showIntro=false;
+      introOverlay.style.display="none";
+      gameRunning=true;
+      resetGame();
+    }
+    function toggleShop(){
+      if(showShop){
+        showShop=false;
+        shopOverlay.style.display="none";
+      } else {
+        showShop=true;
+        renderShop();
+        shopOverlay.style.display="flex";
+      }
+    }
+
+    document.getElementById("startBtn").onclick=startGame;
+    document.getElementById("closeIntroBtn").onclick=startGame;
+    document.getElementById("closeShopBtn").onclick=()=>{
+      showShop=false;
+      shopOverlay.style.display="none";
+    };
+
+    // ===== Keyboard =====
+    document.addEventListener("keydown", (e)=>{
+      if(e.code==="Space"){
+        if(showIntro){ startGame(); }
+        else if(!showShop){ birdVY=flapStrength; playBeep(400);} 
+      }
+      if(e.code==="KeyS" && !showIntro){ toggleShop(); }
+      if(e.code==="KeyP"){ paused=!paused; }
+      if(e.code==="Escape"){
+        showIntro=false; introOverlay.style.display="none";
+        showShop=false; shopOverlay.style.display="none";
+      }
+    });
+
+    // Mobile Touch
+    canvas.addEventListener("touchstart",()=>{
+      if(showIntro){ startGame(); }
+      else if(!showShop){ birdVY=flapStrength; }
+    });
+  </script>
+</body>
+</html>
       // coin
       pctx.fillStyle=s.coin; pctx.beginPath(); pctx.arc(110,18,6,0,Math.PI*2); pctx.fill();
       thumb.appendChild(pv);
